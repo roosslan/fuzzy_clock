@@ -1,0 +1,11 @@
+QWidget#fuzzyClockWindow {
+	background-color: black;
+	border: 1px solid lime;
+}
+
+QWidget#timeLabel {
+	color: lime;
+	font-size: 8pt;
+	font-weight: bold;
+	font-family: Tahoma;
+}

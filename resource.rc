@@ -1,0 +1,32 @@
+#include "winver.h"
+
+IDI_ICON1               ICON    DISCARDABLE     "app.ico"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 3,1,3,2004
+ PRODUCTVERSION 3,1,3,2004
+ FILEFLAGS 0x0L
+ FILEFLAGSMASK 0x3fL
+ FILEOS 0x00040004L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "000004b0"
+        BEGIN
+            VALUE "CompanyName", "rasa"
+            VALUE "FileDescription", "Fuzzy Clock"
+            VALUE "FileVersion", "3.1.3.2004"
+            VALUE "LegalCopyright", "Copyright (C) rasa 2004 - 2026"
+            VALUE "InternalName", "fuzzy_clock"
+            VALUE "OriginalFilename", "fuzzy_clock.exe"
+            VALUE "ProductName", "Fuzzy Clock"
+            VALUE "ProductVersion", "3.1.3.2004"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0, 1200
+    END
+END
