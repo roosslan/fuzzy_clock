@@ -21,7 +21,7 @@ void/int fuzzyClockWindow::DisplayTime(int a,int b)
 
 */
 
-fuzzyClockWindow::fuzzyClockWindow() : m_Settings("HKEY_CURRENT_USER\\SOFTWARE\\alabuga.dev\\FuzzyClock", QSettings::NativeFormat) // , fuzzyClock(this->winId() )
+fuzzyClockWindow::fuzzyClockWindow() : m_Settings("HKEY_CURRENT_USER\\SOFTWARE\\rasa\\FuzzyClock", QSettings::NativeFormat) // , fuzzyClock(this->winId() )
 {
     this->setToolTip("TO DO: time as a hint");
 
