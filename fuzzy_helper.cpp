@@ -2,20 +2,15 @@
 #include <QString>
 #include <QSettings>
 
-#include <fuzzy_clock.h>
-#include <fuzzy_helper.h>
+#include "fuzzy_clock.h"
+#include "fuzzy_helper.h"
 
-void fuzzyHelper::readArrays()
+void fuzzyHelper::readArrays(fuzzyClock &clock)
 {
-    fuzzyClock::instance().vectMinuteRefer = iniValueToVector<int>("oldstyle", "minuteRefer");
-
-    fuzzyClock::instance().vectMinutes = iniValueToVector<QString>("oldstyle", "minutes");
-    fuzzyClock::instance().vectNominativeHours = iniValueToVector<QString>("oldstyle", "nominativeHours");
-    fuzzyClock::instance().vectGenitiveHours = iniValueToVector<QString>("oldstyle", "genitiveHours");
-
-//        std::copy(vectMinutes.begin(), vectMinutes.end(), fuzzyMinutes);
-//        std::copy(vectMinuteRefer.begin(), vectMinuteRefer.end(), minuteRefer);
-
+    clock.vectMinuteRefer     = iniValueToVector<int>("oldstyle", "minuteRefer");
+    clock.vectMinutes         = iniValueToVector<QString>("oldstyle", "minutes");
+    clock.vectNominativeHours = iniValueToVector<QString>("oldstyle", "nominativeHours");
+    clock.vectGenitiveHours   = iniValueToVector<QString>("oldstyle", "genitiveHours");
 }
 
 std::shared_ptr<fuzzyHelper> fuzzyHelper::instance()

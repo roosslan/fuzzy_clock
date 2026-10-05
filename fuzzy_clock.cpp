@@ -1,77 +1,34 @@
-#include <time.h>
-#include <vector>
-
-#include <QSettings>
-#include <QMessageBox>
+#include <algorithm>
 
 #include "fuzzy_clock.h"
-#include "fuzzy_helper.h"
-#include "fuzzy_clock_window.h"
 
-int fuzzyClock::getHourNow(int h12)
+bool fuzzyClock::isValid() const
 {
-    time_t t = time(0);   // get time now
-    tm* now = localtime(&t);
-    if (12 == h12) // запрошен 12-часовой формат времени
-        // если время в диапазоне от 12 до 23, чтобы
-        // из массива считывались значения от 0 до 11
-        if (now->tm_hour >= 12)
-            return now->tm_hour - 12;
-    return now->tm_hour;
+    if (vectMinuteRefer.size() != 60 || vectNominativeHours.size() != 12 || vectGenitiveHours.size() != 12)
+        return false;
+    // каждая ссылка из minuteRefer должна указывать на существующую фразу
+    return std::all_of(vectMinuteRefer.begin(), vectMinuteRefer.end(),
+                       [this](int i) { return i >= 0 && i < int(vectMinutes.size()); });
 }
 
-int fuzzyClock::getMinuteNow()
+QString fuzzyClock::text(const QTime &time) const
 {
-    time_t t = time(0);   // get time now
-    tm* now = localtime(&t);
-    return now->tm_min;
-}
+    if (!isValid())
+        return QStringLiteral("Ошибка в fuzzy.conf");
 
-void fuzzyClock::SetLabel(QLabel *timeLabel)
-{
-    m_label = timeLabel;
-    m_label->setObjectName("timeLabel"); // for CSS
-}
+    const int minute = time.minute();
+    int hour = time.hour() % 12;                    // 0..11
 
-void fuzzyClock::DisplayTime()
-{
-    int actMinute = getMinuteNow();
-    hourToUse = getHourNow(12);
+    if (minute <= 2)                                // "Ровно ХХ" - текущий час, а не следующий
+        hour = (hour + 11) % 12;                    // 0 -> 11 ("двенадцать"), 1 -> 0 ("час")
 
-    fuzzyHelper::instance()->readArrays();
+/*  if (12 == time.hour() && 0 == minute)
+        return "Полдень";
+    if (0 == time.hour() && 0 == minute)
+        return "Полночь";                           */
 
-    referMinPos = vectMinuteRefer[actMinute];
-    timeToShow = vectMinutes[referMinPos];
-
-    if (actMinute >= 0 && actMinute <= 2 && hourToUse != 0) // "Ровно ХХ"
-        hourToUse--;
-    if (actMinute >= 0 && actMinute <= 2 && 0 == hourToUse)
-        hourToUse = 11; // Для винительного падежа
-
-/*    if (12 == getHourNow(24) && 0 == getMinuteNow())
-          timeToShow = "Полдень";
-      if (0 == getHourNow(24) && 0 == getMinuteNow())
-          timeToShow = "Полночь";                         */
-
-    if (timeToShow.contains("%0"))
-    {
-        timeToShow.replace("%0", "%1");
-        timeToShow = vectMinutes[referMinPos].arg(vectNominativeHours[hourToUse]);
-    }
-    if (timeToShow.contains("%1")){
-        //timeToShow.replace("%0", "%1");
-        timeToShow = vectMinutes[referMinPos].arg(vectGenitiveHours[hourToUse]);
-    }
-
-    m_label->setText(timeToShow);
-    fWidth = m_label->fontMetrics().boundingRect(m_label->text()).width();
-    fHeight = m_label->fontMetrics().boundingRect(m_label->text()).height();
-    m_label->setGeometry(5, 5, fWidth, fHeight);
-    m_label->setFixedWidth(fWidth);
-    m_window->setFixedSize(fWidth + 10, fHeight + 10);
-}
-
-void fuzzyClock::SetWindow(QWidget *pWindow)
-{
-    m_window = pWindow;
+    const QString &phrase = vectMinutes[vectMinuteRefer[minute]];
+    if (phrase.contains("%0"))                      // именительный падеж: "Без пяти два"
+        return phrase.arg(vectNominativeHours[hour]);
+    return phrase.arg(vectGenitiveHours[hour]);     // родительный падеж: "Пять минут второго"
 }

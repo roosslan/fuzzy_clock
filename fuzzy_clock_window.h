@@ -1,53 +1,50 @@
+#ifndef FUZZY_CLOCK_WINDOW_H
+#define FUZZY_CLOCK_WINDOW_H
+
+#include <QWidget>
+#include <QSettings>
+#include <QTimer>
+
 #include "fuzzy_clock.h"
 
-#include <QtGui>
-#include <QtWidgets/QApplication>
-#include <Windows.h>
-#include <WtsApi32.h>
-#include <QDebug>
-#include <QLabel>
-
-
-constexpr int ID_TIMER = 100;
+class QLabel;
+class QAction;
 
 class fuzzyClockWindow : public QWidget
 {
+    Q_OBJECT
+    Q_DISABLE_COPY_MOVE(fuzzyClockWindow)       // QWidget не копируется и не перемещается
+
+public:
+    fuzzyClockWindow();
+    ~fuzzyClockWindow() override;
+
+protected:
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
+    void contextMenuEvent(QContextMenuEvent *event) override;
+    void closeEvent(QCloseEvent *event) override;
+    bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override;
+
+private slots:
+    void about();
+    void updateTime();
+
 private:
-//  fuzzyClock fuzzyClock;
+    void createActions();
+    void restorePosition();
+    void savePosition();
+
+    fuzzyClock m_clock;
+    QLabel *m_label;
+    QTimer m_timer;
+    QSettings m_Settings;
+    QPoint mpos;
 
     QAction *aboutAct;
     QAction *aboutQtAct;
     QAction *exitAct;
-    QSettings m_Settings;
-
-    void createActions();
-
-private slots:
-    void about();
-    void exit();
-
-    void mouseMoveEvent(QMouseEvent *event) override;
-    virtual bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) ;
-    void contextMenuEvent(QContextMenuEvent *event) override;
-
-public:
-    QPoint mpos;
-    fuzzyClockWindow();
-
-    ~fuzzyClockWindow();
-
-    /* const A ca;          // A()
-       A b(ca)              // A(const A&)
-       A c = ca;            // A(const A&)  */
-    fuzzyClockWindow(const fuzzyClockWindow &other);
-
-    fuzzyClockWindow& operator=(const fuzzyClockWindow &other);
-
-    fuzzyClockWindow(fuzzyClockWindow&& other);    
-    fuzzyClockWindow &operator=(fuzzyClockWindow&& other);
-
-/*  int DisplayTime(int a,int b);       */
-    /* could be replaced by rxQt */
-    void mousePressEvent(QMouseEvent *event);
-
 };
+
+#endif // FUZZY_CLOCK_WINDOW_H
