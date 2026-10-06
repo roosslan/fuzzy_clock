@@ -1,3 +1,6 @@
+#ifndef FUZZY_HELPER_H
+#define FUZZY_HELPER_H
+
 #include <memory>
 #include <vector>
 #include <QString>
@@ -8,6 +11,8 @@
 #else
     #include <QtCore5Compat/QTextCodec>
 #endif
+
+struct fuzzyClock;
 
 struct fuzzyHelper // : public QWidget
 {
@@ -82,8 +87,10 @@ struct fuzzyHelper // : public QWidget
         return vectRet;
     }
 
-   void readArrays();
+   void readArrays(fuzzyClock &clock);
 
 private:
    fuzzyHelper(){};
 };
+
+#endif // FUZZY_HELPER_H
