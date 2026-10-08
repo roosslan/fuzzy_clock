@@ -1,17 +1,12 @@
 # work-around for QTBUG-13496
-CONFIG += no_batch \
-          precompile_header
+CONFIG += no_batch
 
 QT +=   core gui \
-        widgets \
-        core5compat
+        widgets
 
 LIBS += \
         -lwtsapi32 \
         -luser32
-
-INCLUDEPATH += C:\Program Files (x64)\Qt\6.10.0\msvc2022_64\include \
-                C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\include
 
 RC_ICONS = app.ico
 ICON = app.ico

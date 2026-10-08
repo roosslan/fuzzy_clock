@@ -12,7 +12,6 @@ fuzzyClockWindow::fuzzyClockWindow()
     // флаги задаются до создания нативного окна (winId)
     setWindowFlags(Qt::WindowStaysOnTopHint | Qt::SubWindow | Qt::Window | Qt::FramelessWindowHint);
     setWindowTitle(tr("Неточные часы"));
-    setToolTip("TO DO: time as a hint");
 
     /* for CSS */
     setObjectName("fuzzyClockWindow");
@@ -46,6 +45,7 @@ void fuzzyClockWindow::updateTime()
 {
     const QTime now = QTime::currentTime();
     m_label->setText(m_clock.text(now));
+    setToolTip(now.toString("HH:mm"));             // точное время - в подсказке
     m_label->adjustSize();                          // учитывает шрифт из CSS (вызывает ensurePolished)
     setFixedSize(m_label->size() + QSize(10, 10));
 
