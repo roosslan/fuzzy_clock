@@ -31,6 +31,10 @@ nmake
 windeployqt fuzzy_clock.exe
 ```
 
+## Двоичные файлы
+
+Собранные файлы в репозитории не хранятся, они публикуются в [GitHub Releases](https://github.com/roosslan/fuzzy_clock/releases). В релизе v3.1.3 лежит только архив библиотек Qt прежней версии, без `fuzzy_clock.exe`.
+
 ## Файлы рядом с exe
 
 Файлы `fuzzy.conf` и `style.css` ищутся в директории, где находится `fuzzy_clock.exe`.
