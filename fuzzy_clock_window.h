@@ -48,6 +48,10 @@ private:
     void restorePosition();
     void savePosition();
 
+    // Прилипание к краям экрана (расчёты - в fuzzy_dock.h)
+    QRect dockArea(const QPoint &topLeft) const;    // рабочая область экрана, на котором окажется окно
+    void applyDock();                               // удержать прижатые края при смене размера окна или экрана
+
     fuzzyClock::Fuzziness fuzziness() const;
 
     fuzzyClock m_clock;
@@ -55,6 +59,7 @@ private:
     QTimer m_timer;
     QSettings m_Settings;
     QPoint mpos;
+    int m_dock = 0;                                 // сочетание fuzzyDock::Edge
 
     QMenu *m_menu;
     QAction *m_autostartAct;

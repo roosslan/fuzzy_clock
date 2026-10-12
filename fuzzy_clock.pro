@@ -16,11 +16,13 @@ win32: RC_FILE = resource.rc
 
 HEADERS += \
         fuzzy_clock.h \
+        fuzzy_dock.h \
         fuzzy_helper.h \
         fuzzy_clock_window.h
 
 SOURCES += \
         fuzzy_clock.cpp \
+        fuzzy_dock.cpp \
         fuzzy_helper.cpp \
         fuzzy_clock_window.cpp \
         main.cpp
