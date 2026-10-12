@@ -2,19 +2,42 @@
 
 #include "fuzzy_clock.h"
 
-bool fuzzyClock::isValid() const
+namespace {
+
+// каждая ссылка должна указывать на существующий элемент списка
+bool refersInside(const std::vector<int> &refer, size_t referSize, const std::vector<QString> &items)
 {
-    if (vectMinuteRefer.size() != 60 || vectNominativeHours.size() != 12 || vectGenitiveHours.size() != 12)
-        return false;
-    // каждая ссылка из minuteRefer должна указывать на существующую фразу
-    return std::all_of(vectMinuteRefer.begin(), vectMinuteRefer.end(),
-                       [this](int i) { return i >= 0 && i < int(vectMinutes.size()); });
+    return refer.size() == referSize
+        && std::all_of(refer.begin(), refer.end(), [&items](int i) { return i >= 0 && i < int(items.size()); });
 }
 
-QString fuzzyClock::text(const QTime &time) const
+}
+
+bool fuzzyClock::isValid(Fuzziness fuzziness) const
 {
-    if (!isValid())
+    switch (fuzziness) {
+    case Fuzziness::DayPart:
+        return refersInside(vectHourRefer, 24, vectDayParts);
+    case Fuzziness::WeekPart:
+        return refersInside(vectDayRefer, 7, vectWeekParts);
+    case Fuzziness::Minutes:
+        break;
+    }
+    return vectNominativeHours.size() == 12 && vectGenitiveHours.size() == 12
+        && refersInside(vectMinuteRefer, 60, vectMinutes);
+}
+
+QString fuzzyClock::text(const QDateTime &dateTime, Fuzziness fuzziness) const
+{
+    if (!isValid(fuzziness))
         return QStringLiteral("Ошибка в fuzzy.conf");
+
+    const QTime time = dateTime.time();
+
+    if (fuzziness == Fuzziness::DayPart)
+        return vectDayParts[vectHourRefer[time.hour()]];
+    if (fuzziness == Fuzziness::WeekPart)
+        return vectWeekParts[vectDayRefer[dateTime.date().dayOfWeek() - 1]];   // dayOfWeek(): 1 - пн, 7 - вс
 
     const int minute = time.minute();
     int hour = time.hour() % 12;                    // 0..11

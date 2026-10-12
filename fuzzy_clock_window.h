@@ -1,6 +1,7 @@
 #ifndef FUZZY_CLOCK_WINDOW_H
 #define FUZZY_CLOCK_WINDOW_H
 
+#include <QColor>
 #include <QWidget>
 #include <QSettings>
 #include <QTimer>
@@ -9,6 +10,8 @@
 
 class QLabel;
 class QAction;
+class QActionGroup;
+class QMenu;
 
 class fuzzyClockWindow : public QWidget
 {
@@ -31,10 +34,21 @@ private slots:
     void about();
     void updateTime();
 
+    void setAutostart(bool on);
+    void setOnTop(bool on);
+    void chooseFont();
+    void chooseBackgroundColor();
+    void chooseBorderColor();
+
 private:
-    void createActions();
+    void createMenu();
+    void updateMenuChecks();
+    void applyStyle();                          // цвета и шрифт из настроек поверх style.css
+    QColor storedColor(const QString &key, const QColor &fallback) const;
     void restorePosition();
     void savePosition();
+
+    fuzzyClock::Fuzziness fuzziness() const;
 
     fuzzyClock m_clock;
     QLabel *m_label;
@@ -42,9 +56,12 @@ private:
     QSettings m_Settings;
     QPoint mpos;
 
-    QAction *aboutAct;
-    QAction *aboutQtAct;
-    QAction *exitAct;
+    QMenu *m_menu;
+    QAction *m_autostartAct;
+    QAction *m_onTopAct;
+    QActionGroup *m_opacityGroup;
+    QActionGroup *m_fuzzinessGroup;
+    QActionGroup *m_schemeGroup;
 };
 
 #endif // FUZZY_CLOCK_WINDOW_H

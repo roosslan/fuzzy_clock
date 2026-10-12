@@ -1,20 +1,95 @@
 #include <QtWidgets>
 #include <Windows.h>
 #include <WtsApi32.h>
+#include <commdlg.h>
+#include <iterator>
 
 #include "fuzzy_clock_window.h"
 #include "fuzzy_helper.h"
+
+namespace {
+
+const char RunKey[] = "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+const char RunValue[] = "FuzzyClock";
+
+// цвета по умолчанию совпадают со style.css
+const QColor DefaultBackground(Qt::black);
+const QColor DefaultText(0x00, 0xff, 0x00);     // lime
+const QColor DefaultBorder(0x00, 0xff, 0x00);
+
+struct ColorScheme
+{
+    const char *name;
+    QColor background;
+    QColor text;
+    QColor border;
+};
+
+const ColorScheme Schemes[] = {
+    { "Красно-белая", QColor(Qt::white),         QColor(0xb0, 0x00, 0x00), QColor(0xb0, 0x00, 0x00) },
+    { "Сине-жёлтая",  QColor(0x00, 0x2f, 0x87), QColor(Qt::yellow),        QColor(Qt::yellow)        },
+    { "Чёрно-зелёная", DefaultBackground,        DefaultText,              DefaultBorder             },
+};
+
+struct Opacity
+{
+    const char *name;
+    double value;
+};
+
+// процент - видимость окна: 100% - обычное непрозрачное окно
+const Opacity Opacities[] = { { "10%", 0.1 }, { "50%", 0.5 }, { "100%", 1.0 } };
+
+const char *const FuzzinessNames[] = { "Четверть пятого", "Вечер", "Середина недели" };
+
+QString autostartCommand()
+{
+    return "\"" + QDir::toNativeSeparators(QCoreApplication::applicationFilePath()) + "\"";
+}
+
+COLORREF toColorRef(const QColor &color)
+{
+    return RGB(color.red(), color.green(), color.blue());
+}
+
+QColor fromColorRef(COLORREF color)
+{
+    return QColor(GetRValue(color), GetGValue(color), GetBValue(color));
+}
+
+// стандартное окно выбора цвета Windows
+bool chooseColor(HWND owner, QColor &color)
+{
+    static COLORREF customColors[16] = {};      // "Дополнительные цвета" сохраняются до выхода из программы
+
+    CHOOSECOLORW cc = {};
+    cc.lStructSize = sizeof(cc);
+    cc.hwndOwner = owner;
+    cc.rgbResult = toColorRef(color);
+    cc.lpCustColors = customColors;
+    cc.Flags = CC_RGBINIT | CC_FULLOPEN;
+    if (!ChooseColorW(&cc))
+        return false;
+    color = fromColorRef(cc.rgbResult);
+    return true;
+}
+
+}
 
 fuzzyClockWindow::fuzzyClockWindow()
     : m_label(new QLabel(this))
     , m_Settings("HKEY_CURRENT_USER\\SOFTWARE\\rasa\\FuzzyClock", QSettings::NativeFormat)
 {
     // флаги задаются до создания нативного окна (winId)
-    setWindowFlags(Qt::WindowStaysOnTopHint | Qt::SubWindow | Qt::Window | Qt::FramelessWindowHint);
+    Qt::WindowFlags flags = Qt::SubWindow | Qt::Window | Qt::FramelessWindowHint;
+    if (m_Settings.value("OnTop", true).toBool())
+        flags |= Qt::WindowStaysOnTopHint;
+    setWindowFlags(flags);
     setWindowTitle(tr("Неточные часы"));
 
     /* for CSS */
     setObjectName("fuzzyClockWindow");
+    setAttribute(Qt::WA_StyledBackground);          // без этого рамка из CSS у наследника QWidget не рисуется
     m_label->setObjectName("timeLabel");
     m_label->move(5, 5);
 
@@ -27,11 +102,12 @@ fuzzyClockWindow::fuzzyClockWindow()
     connect(&m_timer, &QTimer::timeout, this, &fuzzyClockWindow::updateTime);
 
     restorePosition();
+    setWindowOpacity(m_Settings.value("Opacity", 1.0).toDouble());
 
     /* Context menu */
-    createActions();
+    createMenu();
 
-    updateTime();
+    applyStyle();                                   // заодно выводит время
 }
 
 fuzzyClockWindow::~fuzzyClockWindow()
@@ -41,25 +117,72 @@ fuzzyClockWindow::~fuzzyClockWindow()
         WTSUnRegisterSessionNotification((HWND)id);
 }
 
+fuzzyClock::Fuzziness fuzzyClockWindow::fuzziness() const
+{
+    const int mode = m_Settings.value("Fuzziness", 0).toInt();
+    if (mode < 0 || mode >= int(std::size(FuzzinessNames)))
+        return fuzzyClock::Fuzziness::Minutes;
+    return fuzzyClock::Fuzziness(mode);
+}
+
 void fuzzyClockWindow::updateTime()
 {
-    const QTime now = QTime::currentTime();
-    m_label->setText(m_clock.text(now));
-    setToolTip(now.toString("HH:mm"));             // точное время - в подсказке
+    const QDateTime now = QDateTime::currentDateTime();
+    m_label->setText(m_clock.text(now, fuzziness()));
+    // точное время и дата - в подсказке
+    setToolTip(QLocale(QLocale::Russian).toString(now, "HH:mm, dddd, d MMMM"));
     m_label->adjustSize();                          // учитывает шрифт из CSS (вызывает ensurePolished)
     setFixedSize(m_label->size() + QSize(10, 10));
 
     // следующее обновление - в начале следующей минуты
-    m_timer.start(60000 - now.msecsSinceStartOfDay() % 60000);
+    m_timer.start(60000 - now.time().msecsSinceStartOfDay() % 60000);
+}
+
+QColor fuzzyClockWindow::storedColor(const QString &key, const QColor &fallback) const
+{
+    const QColor color(m_Settings.value(key).toString());
+    return color.isValid() ? color : fallback;
+}
+
+void fuzzyClockWindow::applyStyle()
+{
+    QStringList window, label;
+
+    const QString background = m_Settings.value("BackgroundColor").toString();
+    if (!background.isEmpty())
+        window << "background-color: " + background;
+    const QString border = m_Settings.value("BorderColor").toString();
+    if (!border.isEmpty())
+        window << "border: 1px solid " + border;
+    const QString text = m_Settings.value("TextColor").toString();
+    if (!text.isEmpty())
+        label << "color: " + text;
+
+    QFont font;
+    const QString fontString = m_Settings.value("Font").toString();
+    if (!fontString.isEmpty() && font.fromString(fontString)) {
+        QStringList decoration;
+        if (font.underline())
+            decoration << "underline";
+        if (font.strikeOut())
+            decoration << "line-through";
+        label << QString("font-family: \"%1\"").arg(font.family())
+              << QString("font-size: %1pt").arg(font.pointSizeF())
+              << QString("font-weight: %1").arg(int(font.weight()))
+              << QString("font-style: %1").arg(font.italic() ? "italic" : "normal")
+              << "text-decoration: " + (decoration.isEmpty() ? QString("none") : decoration.join(' '));
+    }
+
+    // стиль окна имеет приоритет над style.css, не заданные здесь свойства берутся из style.css
+    setStyleSheet(QString("QWidget#fuzzyClockWindow { %1 } QWidget#timeLabel { %2 }")
+                  .arg(window.join("; "), label.join("; ")));
+    updateTime();                                   // размер окна зависит от шрифта
 }
 
 void fuzzyClockWindow::contextMenuEvent(QContextMenuEvent *event)
 {
-    QMenu menu(this);
-    menu.addAction(aboutAct);
-    menu.addAction(aboutQtAct);
-    menu.addAction(exitAct);
-    menu.exec(event->globalPos());
+    updateMenuChecks();
+    m_menu->exec(event->globalPos());
 }
 
 void fuzzyClockWindow::mousePressEvent(QMouseEvent *event)
@@ -114,20 +237,167 @@ void fuzzyClockWindow::restorePosition()
     move(p);
 }
 
-void fuzzyClockWindow::createActions()
+void fuzzyClockWindow::createMenu()
 {
-    aboutAct = new QAction(tr("&About"), this);
-    aboutAct->setStatusTip(tr("Show the application's About box"));
-    connect(aboutAct, &QAction::triggered, this, &fuzzyClockWindow::about);
+    m_menu = new QMenu(this);
 
-    aboutQtAct = new QAction(tr("About &Qt"), this);
-    aboutQtAct->setStatusTip(tr("Show the Qt library's About box"));
-    connect(aboutQtAct, &QAction::triggered, qApp, &QApplication::aboutQt);
+    m_autostartAct = m_menu->addAction(tr("Добавить в автозагрузку"));
+    m_autostartAct->setCheckable(true);
+    connect(m_autostartAct, &QAction::triggered, this, &fuzzyClockWindow::setAutostart);
 
-    exitAct = new QAction(tr("E&xit"), this);
-    exitAct->setShortcuts(QKeySequence::Quit);
-    exitAct->setStatusTip(tr("Exit the application"));
-    connect(exitAct, &QAction::triggered, this, &QWidget::close);
+    m_onTopAct = m_menu->addAction(tr("Всегда наверху"));
+    m_onTopAct->setCheckable(true);
+    connect(m_onTopAct, &QAction::triggered, this, &fuzzyClockWindow::setOnTop);
+
+    m_menu->addSeparator();
+    m_menu->addAction(tr("Шрифт..."), this, &fuzzyClockWindow::chooseFont);
+    m_menu->addAction(tr("Цвет фона..."), this, &fuzzyClockWindow::chooseBackgroundColor);
+    m_menu->addAction(tr("Цвет рамки..."), this, &fuzzyClockWindow::chooseBorderColor);
+
+    QMenu *opacityMenu = m_menu->addMenu(tr("Прозрачность"));
+    m_opacityGroup = new QActionGroup(this);
+    for (const Opacity &opacity : Opacities) {
+        QAction *act = opacityMenu->addAction(opacity.name);
+        act->setCheckable(true);
+        act->setData(opacity.value);
+        m_opacityGroup->addAction(act);
+    }
+    connect(m_opacityGroup, &QActionGroup::triggered, this, [this](QAction *act) {
+        setWindowOpacity(act->data().toDouble());
+        m_Settings.setValue("Opacity", act->data().toDouble());
+    });
+
+    QMenu *fuzzinessMenu = m_menu->addMenu(tr("Неточность"));
+    m_fuzzinessGroup = new QActionGroup(this);
+    for (int i = 0; i < int(std::size(FuzzinessNames)); ++i) {
+        QAction *act = fuzzinessMenu->addAction(tr(FuzzinessNames[i]));
+        act->setCheckable(true);
+        act->setData(i);
+        m_fuzzinessGroup->addAction(act);
+    }
+    connect(m_fuzzinessGroup, &QActionGroup::triggered, this, [this](QAction *act) {
+        m_Settings.setValue("Fuzziness", act->data().toInt());
+        updateTime();
+    });
+
+    QMenu *schemeMenu = m_menu->addMenu(tr("Схемы"));
+    m_schemeGroup = new QActionGroup(this);
+    for (int i = 0; i < int(std::size(Schemes)); ++i) {
+        QAction *act = schemeMenu->addAction(tr(Schemes[i].name));
+        act->setCheckable(true);
+        act->setData(i);
+        m_schemeGroup->addAction(act);
+    }
+    connect(m_schemeGroup, &QActionGroup::triggered, this, [this](QAction *act) {
+        const ColorScheme &scheme = Schemes[act->data().toInt()];
+        m_Settings.setValue("BackgroundColor", scheme.background.name());
+        m_Settings.setValue("TextColor", scheme.text.name());
+        m_Settings.setValue("BorderColor", scheme.border.name());
+        applyStyle();
+    });
+
+    m_menu->addSeparator();
+    m_menu->addAction(tr("О программе..."), this, &fuzzyClockWindow::about);
+    m_menu->addAction(tr("О Qt..."), qApp, &QApplication::aboutQt);
+    m_menu->addSeparator();
+    m_menu->addAction(tr("Выход"), this, &QWidget::close);
+}
+
+// галочки отражают текущее состояние, в том числе изменённое вне программы (автозагрузка)
+void fuzzyClockWindow::updateMenuChecks()
+{
+    const QSettings run(RunKey, QSettings::NativeFormat);
+    m_autostartAct->setChecked(run.value(RunValue).toString().compare(autostartCommand(), Qt::CaseInsensitive) == 0);
+
+    m_onTopAct->setChecked(windowFlags().testFlag(Qt::WindowStaysOnTopHint));
+
+    for (QAction *act : m_opacityGroup->actions())
+        act->setChecked(qFuzzyCompare(act->data().toDouble(), windowOpacity()));
+
+    for (QAction *act : m_fuzzinessGroup->actions())
+        act->setChecked(act->data().toInt() == int(fuzziness()));
+
+    // схема отмечена, только если все три цвета совпадают с ней
+    const QColor background = storedColor("BackgroundColor", DefaultBackground);
+    const QColor text = storedColor("TextColor", DefaultText);
+    const QColor border = storedColor("BorderColor", DefaultBorder);
+    for (QAction *act : m_schemeGroup->actions()) {
+        const ColorScheme &scheme = Schemes[act->data().toInt()];
+        act->setChecked(scheme.background == background && scheme.text == text && scheme.border == border);
+    }
+}
+
+void fuzzyClockWindow::setAutostart(bool on)
+{
+    QSettings run(RunKey, QSettings::NativeFormat);
+    if (on)
+        run.setValue(RunValue, autostartCommand());
+    else
+        run.remove(RunValue);
+}
+
+void fuzzyClockWindow::setOnTop(bool on)
+{
+    setWindowFlag(Qt::WindowStaysOnTopHint, on);
+    show();                                         // setWindowFlag() скрывает окно
+    m_Settings.setValue("OnTop", on);
+}
+
+// стандартное окно выбора шрифта Windows; цвет текста выбирается там же
+void fuzzyClockWindow::chooseFont()
+{
+    const QFont current = m_label->font();          // шрифт уже с учётом CSS
+
+    LOGFONTW lf = {};
+    const HDC dc = GetDC(nullptr);
+    const double pointSize = current.pointSizeF() > 0 ? current.pointSizeF() : 8;
+    lf.lfHeight = -qRound(pointSize * GetDeviceCaps(dc, LOGPIXELSY) / 72.0);
+    ReleaseDC(nullptr, dc);
+    lf.lfWeight = int(current.weight());
+    lf.lfItalic = current.italic();
+    lf.lfUnderline = current.underline();
+    lf.lfStrikeOut = current.strikeOut();
+    lf.lfCharSet = DEFAULT_CHARSET;
+    const std::wstring family = current.family().toStdWString();
+    wcsncpy_s(lf.lfFaceName, LF_FACESIZE, family.c_str(), _TRUNCATE);
+
+    CHOOSEFONTW cf = {};
+    cf.lStructSize = sizeof(cf);
+    cf.hwndOwner = (HWND)winId();
+    cf.lpLogFont = &lf;
+    cf.Flags = CF_INITTOLOGFONTSTRUCT | CF_EFFECTS | CF_SCREENFONTS;
+    cf.rgbColors = toColorRef(storedColor("TextColor", DefaultText));
+    if (!ChooseFontW(&cf))
+        return;
+
+    QFont font(QString::fromWCharArray(lf.lfFaceName));
+    font.setPointSizeF(cf.iPointSize / 10.0);       // iPointSize - в десятых долях пункта
+    font.setWeight(QFont::Weight(lf.lfWeight ? lf.lfWeight : FW_NORMAL));
+    font.setItalic(lf.lfItalic);
+    font.setUnderline(lf.lfUnderline);
+    font.setStrikeOut(lf.lfStrikeOut);
+
+    m_Settings.setValue("Font", font.toString());
+    m_Settings.setValue("TextColor", fromColorRef(cf.rgbColors).name());
+    applyStyle();
+}
+
+void fuzzyClockWindow::chooseBackgroundColor()
+{
+    QColor color = storedColor("BackgroundColor", DefaultBackground);
+    if (!chooseColor((HWND)winId(), color))
+        return;
+    m_Settings.setValue("BackgroundColor", color.name());
+    applyStyle();
+}
+
+void fuzzyClockWindow::chooseBorderColor()
+{
+    QColor color = storedColor("BorderColor", DefaultBorder);
+    if (!chooseColor((HWND)winId(), color))
+        return;
+    m_Settings.setValue("BorderColor", color.name());
+    applyStyle();
 }
 
 void fuzzyClockWindow::about()
