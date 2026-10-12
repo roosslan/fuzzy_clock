@@ -14,17 +14,25 @@ QStringList fuzzyHelper::iniValue(const QString &groupName, const QString &keyNa
 void fuzzyHelper::readArrays(fuzzyClock &clock)
 {
     const auto toVector = [](const QStringList &list) { return std::vector<QString>(list.begin(), list.end()); };
+    const auto toNumbers = [](const QStringList &list) {
+        std::vector<int> numbers;
+        for (const QString &item : list) {
+            bool ok = false;
+            const int pos = item.toInt(&ok);
+            numbers.push_back(ok ? pos : -1);       // -1 не пройдёт проверку fuzzyClock::isValid()
+        }
+        return numbers;
+    };
 
-    clock.vectMinuteRefer.clear();
-    for (const QString &item : iniValue("oldstyle", "minuteRefer", ' ')) {
-        bool ok = false;
-        const int pos = item.toInt(&ok);
-        clock.vectMinuteRefer.push_back(ok ? pos : -1);     // -1 не пройдёт проверку fuzzyClock::isValid()
-    }
-
+    clock.vectMinuteRefer     = toNumbers(iniValue("oldstyle", "minuteRefer", ' '));
     clock.vectMinutes         = toVector(iniValue("oldstyle", "minutes", '\\'));
     clock.vectNominativeHours = toVector(iniValue("oldstyle", "nominativeHours", '\\'));
     clock.vectGenitiveHours   = toVector(iniValue("oldstyle", "genitiveHours", '\\'));
+
+    clock.vectDayParts  = toVector(iniValue("dayparts", "names", '\\'));
+    clock.vectHourRefer = toNumbers(iniValue("dayparts", "hourRefer", ' '));
+    clock.vectWeekParts = toVector(iniValue("weekparts", "names", '\\'));
+    clock.vectDayRefer  = toNumbers(iniValue("weekparts", "dayRefer", ' '));
 }
 
 std::shared_ptr<fuzzyHelper> fuzzyHelper::instance()

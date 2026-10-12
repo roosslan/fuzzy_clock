@@ -6,7 +6,9 @@ QT +=   core gui \
 
 LIBS += \
         -lwtsapi32 \
-        -luser32
+        -luser32 \
+        -lgdi32 \
+        -lcomdlg32
 
 RC_ICONS = app.ico
 ICON = app.ico
