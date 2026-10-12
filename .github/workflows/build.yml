@@ -1,0 +1,67 @@
+name: Сборка
+
+on:
+  push:
+    branches: [trunk]
+    tags: ['v*']
+  pull_request:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write          # для публикации релиза по тегу
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.10.0'
+          arch: win64_msvc2022_64
+          cache: true
+
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Сборка
+        run: |
+          qmake fuzzy_clock.pro "CONFIG+=release"
+          nmake release
+
+      - name: Развёртывание
+        run: |
+          New-Item -ItemType Directory deploy | Out-Null
+          Copy-Item release\fuzzy_clock.exe, fuzzy.conf, style.css deploy\
+          windeployqt --release --no-translations deploy\fuzzy_clock.exe
+
+      - name: Упаковка в CAB
+        run: |
+          # makecab сохраняет поддиректории (platforms\, styles\ и т.д.) только через DDF-файл
+          $root = (Resolve-Path deploy).Path
+          $ddf = @(
+            '.OPTION EXPLICIT'
+            '.Set CabinetNameTemplate=fuzzy_clock-win64.cab'
+            '.Set DiskDirectoryTemplate=.'
+            '.Set CompressionType=LZX'
+            '.Set MaxDiskSize=0'
+            '.Set UniqueFiles=OFF'
+            '.Set Cabinet=ON'
+            '.Set Compress=ON'
+          )
+          Get-ChildItem $root -Recurse -File | ForEach-Object {
+            $ddf += '"{0}" "{1}"' -f $_.FullName, $_.FullName.Substring($root.Length + 1)
+          }
+          $ddf | Set-Content fuzzy_clock.ddf -Encoding ascii
+          makecab.exe -F fuzzy_clock.ddf
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fuzzy_clock-win64
+          path: fuzzy_clock-win64.cab
+
+      - name: Релиз
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: fuzzy clock ${{ github.ref_name }}
+          files: fuzzy_clock-win64.cab

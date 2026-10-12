@@ -133,6 +133,6 @@ void fuzzyClockWindow::createActions()
 void fuzzyClockWindow::about()
 {
     QMessageBox::about(this, tr("О \"Неточных\" часах..."),
-            tr("\"Неточные\" часы v3.1.3,        <br/> (ремейк версии 2.1  "
+            tr("\"Неточные\" часы v3.1.4,        <br/> (ремейк версии 2.1  "
                "от 12.01.2004)<br/>rasa"));
 }
