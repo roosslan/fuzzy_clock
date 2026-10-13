@@ -5,6 +5,7 @@
 #include <iterator>
 
 #include "fuzzy_clock_window.h"
+#include "fuzzy_dock.h"
 #include "fuzzy_helper.h"
 
 namespace {
@@ -41,6 +42,9 @@ struct Opacity
 const Opacity Opacities[] = { { "10%", 0.1 }, { "50%", 0.5 }, { "100%", 1.0 } };
 
 const char *const FuzzinessNames[] = { "Четверть пятого", "Вечер", "Середина недели" };
+
+// на каком расстоянии от края экрана окно к нему притягивается
+constexpr int SnapDistance = 15;
 
 QString autostartCommand()
 {
@@ -104,6 +108,15 @@ fuzzyClockWindow::fuzzyClockWindow()
     restorePosition();
     setWindowOpacity(m_Settings.value("Opacity", 1.0).toDouble());
 
+    // панель задач переместилась, сменилось разрешение - окно остаётся у своих краёв
+    const auto watchScreen = [this](QScreen *screen) {
+        connect(screen, &QScreen::availableGeometryChanged, this, &fuzzyClockWindow::applyDock);
+    };
+    for (QScreen *screen : QGuiApplication::screens())
+        watchScreen(screen);
+    connect(qApp, &QGuiApplication::screenAdded, this, watchScreen);
+    connect(qApp, &QGuiApplication::screenRemoved, this, &fuzzyClockWindow::applyDock, Qt::QueuedConnection);
+
     /* Context menu */
     createMenu();
 
@@ -133,6 +146,7 @@ void fuzzyClockWindow::updateTime()
     setToolTip(QLocale(QLocale::Russian).toString(now, "HH:mm, dddd, d MMMM"));
     m_label->adjustSize();                          // учитывает шрифт из CSS (вызывает ensurePolished)
     setFixedSize(m_label->size() + QSize(10, 10));
+    applyDock();                                    // при прилипании справа или снизу окно растёт внутрь экрана
 
     // следующее обновление - в начале следующей минуты
     m_timer.start(60000 - now.time().msecsSinceStartOfDay() % 60000);
@@ -190,17 +204,45 @@ void fuzzyClockWindow::mousePressEvent(QMouseEvent *event)
     mpos = event->pos();
 }
 
-// Drag window without title
+// Drag window without title; Shift отключает прилипание к краям
 void fuzzyClockWindow::mouseMoveEvent(QMouseEvent *event)
 {
-    if (event->buttons() & Qt::LeftButton)
-        move(pos() + event->pos() - mpos);
+    if (!(event->buttons() & Qt::LeftButton))
+        return;
+    const QPoint p = pos() + event->pos() - mpos;
+    if (event->modifiers() & Qt::ShiftModifier)
+        move(p);
+    else
+        move(fuzzyDock::snapped(QRect(p, size()), dockArea(p), SnapDistance));
 }
 
 void fuzzyClockWindow::mouseReleaseEvent(QMouseEvent *event)
 {
-    if (event->button() == Qt::LeftButton)
+    if (event->button() == Qt::LeftButton) {
+        m_dock = fuzzyDock::edges(geometry(), dockArea(pos()));
         savePosition();                             // перетаскивание закончено
+    }
+}
+
+QRect fuzzyClockWindow::dockArea(const QPoint &topLeft) const
+{
+    const QScreen *screen = QGuiApplication::screenAt(QRect(topLeft, size()).center());
+    if (!screen)
+        screen = QGuiApplication::screenAt(pos());
+    if (!screen)
+        screen = QGuiApplication::primaryScreen();
+    return screen->availableGeometry();             // без панели задач
+}
+
+void fuzzyClockWindow::applyDock()
+{
+    if (!m_dock)
+        return;
+    const QPoint p = fuzzyDock::docked(geometry(), dockArea(pos()), m_dock);
+    if (p != pos()) {
+        move(p);
+        savePosition();
+    }
 }
 
 void fuzzyClockWindow::closeEvent(QCloseEvent *event)
@@ -226,6 +268,7 @@ void fuzzyClockWindow::savePosition()
     m_Settings.setValue("currentPath", QDir::currentPath());
     m_Settings.setValue("Top", pos().y());
     m_Settings.setValue("Left", pos().x());
+    m_Settings.setValue("Dock", m_dock);
 }
 
 void fuzzyClockWindow::restorePosition()
@@ -235,6 +278,7 @@ void fuzzyClockWindow::restorePosition()
     if (!QGuiApplication::screenAt(p))
         p = QGuiApplication::primaryScreen()->availableGeometry().center();
     move(p);
+    m_dock = m_Settings.value("Dock", 0).toInt();   // применяется после первого расчёта размера в updateTime()
 }
 
 void fuzzyClockWindow::createMenu()

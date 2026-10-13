@@ -27,6 +27,15 @@ jobs:
           qmake fuzzy_clock.pro "CONFIG+=release"
           nmake release
 
+      - name: Тесты
+        run: |
+          New-Item -ItemType Directory tests-build | Out-Null
+          Set-Location tests-build
+          qmake ..\tests\tests.pro "CONFIG+=release"
+          nmake release
+          .\release\fuzzy_clock_tests.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Развёртывание
         run: |
           New-Item -ItemType Directory deploy | Out-Null
