@@ -3,16 +3,16 @@ QT = core testlib
 CONFIG += console testcase
 TARGET = fuzzy_clock_tests
 
-INCLUDEPATH += ..
+INCLUDEPATH += ../src
 DEFINES += SOURCE_DIR=\\\"$$PWD/..\\\"
 
 HEADERS += \
-        ../fuzzy_clock.h \
-        ../fuzzy_dock.h \
-        ../fuzzy_helper.h
+        ../src/fuzzy_clock.h \
+        ../src/fuzzy_dock.h \
+        ../src/fuzzy_helper.h
 
 SOURCES += \
         tst_fuzzy_clock.cpp \
-        ../fuzzy_clock.cpp \
-        ../fuzzy_dock.cpp \
-        ../fuzzy_helper.cpp
+        ../src/fuzzy_clock.cpp \
+        ../src/fuzzy_dock.cpp \
+        ../src/fuzzy_helper.cpp
