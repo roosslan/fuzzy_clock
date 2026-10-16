@@ -6,12 +6,11 @@
 
 ![fuzzy_clock.gif](fuzzy_clock.gif)
 
-
 ## Сборка
 
 Требуется Windows, Qt 6 (модуль `widgets`) и MSVC.
 
-Сборка либо в в Qt Creator либо из командной строки msvs:
+Сборка либо в Qt Creator либо из командной строки msvs:
 
 ```bat
 qmake fuzzy_clock.pro
