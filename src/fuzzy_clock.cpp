@@ -4,9 +4,8 @@
 
 namespace {
 
-// каждая ссылка должна указывать на существующий элемент списка
-bool refersInside(const std::vector<int> &refer, size_t referSize, const std::vector<QString> &items)
-{
+/* каждая ссылка должна указывать на существующий элемент списка */
+bool refersInside(const std::vector<int> &refer, size_t referSize, const std::vector<QString> &items) {
     return refer.size() == referSize
         && std::all_of(refer.begin(), refer.end(), [&items](int i) { return i >= 0 && i < int(items.size()); });
 }
@@ -37,12 +36,12 @@ QString fuzzyClock::text(const QDateTime &dateTime, Fuzziness fuzziness) const
     if (fuzziness == Fuzziness::DayPart)
         return vectDayParts[vectHourRefer[time.hour()]];
     if (fuzziness == Fuzziness::WeekPart)
-        return vectWeekParts[vectDayRefer[dateTime.date().dayOfWeek() - 1]];   // dayOfWeek(): 1 - пн, 7 - вс
+        return vectWeekParts[vectDayRefer[dateTime.date().dayOfWeek() - 1]];   /* dayOfWeek(): 1 - пн, 7 - вс */
 
     const int minute = time.minute();
     int hour = time.hour() % 12;                    // 0..11
 
-    if (minute <= 2)                                // "Ровно ХХ" - текущий час, а не следующий
+    if (minute <= 2)                                /* "Ровно ХХ" - текущий час, а не следующий */
         hour = (hour + 11) % 12;                    // 0 -> 11 ("двенадцать"), 1 -> 0 ("час")
 
 /*  if (12 == time.hour() && 0 == minute)
@@ -51,7 +50,7 @@ QString fuzzyClock::text(const QDateTime &dateTime, Fuzziness fuzziness) const
         return "Полночь";                           */
 
     const QString &phrase = vectMinutes[vectMinuteRefer[minute]];
-    if (phrase.contains("%0"))                      // именительный падеж: "Без пяти два"
+    if (phrase.contains("%0"))                      /* именительный падеж: "Без пяти два" */
         return phrase.arg(vectNominativeHours[hour]);
-    return phrase.arg(vectGenitiveHours[hour]);     // родительный падеж: "Пять минут второго"
+    return phrase.arg(vectGenitiveHours[hour]);     /* родительный падеж: "Пять минут второго" */
 }
