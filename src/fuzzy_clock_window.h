@@ -16,7 +16,36 @@ class QMenu;
 class fuzzyClockWindow : public QWidget
 {
     Q_OBJECT
-    Q_DISABLE_COPY_MOVE(fuzzyClockWindow)       // QWidget не копируется и не перемещается
+    Q_DISABLE_COPY_MOVE(fuzzyClockWindow)       /* QWidget не копируется и не перемещается */
+
+    void create_menu();
+    void update_menu_checks();
+    void apply_style();                          /* цвета и шрифт из настроек поверх style.css */
+    QColor stored_color(const QString &key, const QColor &fallback) const;
+    void restorePosition();
+    void save_position();
+
+    /* Прилипание к краям экрана (расчёты - в fuzzy_dock.h) */
+    QRect dock_area(const QPoint &topLeft) const;    /* рабочая область экрана, на котором окажется окно */
+    void apply_dock();                               /* удержать прижатые края при смене размера окна или экрана */
+
+    fuzzyClock::Fuzziness fuzziness() const;
+
+    fuzzyClock m_fuzzy_clock_;
+    QLabel *m_label_;
+
+    QTimer m_timer;
+    QSettings m_settings_;
+    QPoint m_pos_;
+    int m_dock = 0;                                 /* сочетание fuzzyDock::Edge */
+
+    QMenu *m_menu;
+    QAction *m_act_copy_to_clipboard_;
+    QAction *m_act_autostart_;
+    QAction *m_act_on_top_;
+    QActionGroup *m_act_opacity_group_;
+    QActionGroup *m_act_fuzziness_group_;
+    QActionGroup *m_act_scheme_group_;
 
 public:
     fuzzyClockWindow();
@@ -32,41 +61,13 @@ protected:
 
 private slots:
     void about();
-    void updateTime();
-
-    void setAutostart(bool on);
-    void setOnTop(bool on);
-    void chooseFont();
-    void chooseBackgroundColor();
-    void chooseBorderColor();
-
-private:
-    void createMenu();
-    void updateMenuChecks();
-    void applyStyle();                          // цвета и шрифт из настроек поверх style.css
-    QColor storedColor(const QString &key, const QColor &fallback) const;
-    void restorePosition();
-    void savePosition();
-
-    // Прилипание к краям экрана (расчёты - в fuzzy_dock.h)
-    QRect dockArea(const QPoint &topLeft) const;    // рабочая область экрана, на котором окажется окно
-    void applyDock();                               // удержать прижатые края при смене размера окна или экрана
-
-    fuzzyClock::Fuzziness fuzziness() const;
-
-    fuzzyClock m_clock;
-    QLabel *m_label;
-    QTimer m_timer;
-    QSettings m_Settings;
-    QPoint mpos;
-    int m_dock = 0;                                 // сочетание fuzzyDock::Edge
-
-    QMenu *m_menu;
-    QAction *m_autostartAct;
-    QAction *m_onTopAct;
-    QActionGroup *m_opacityGroup;
-    QActionGroup *m_fuzzinessGroup;
-    QActionGroup *m_schemeGroup;
+    void update_time();
+    void copy_timetext_to_clipboard();
+    void set_autostart(bool on);
+    void set_on_top(bool on);
+    void choose_font();
+    void choose_background_color();
+    void choose_border_color();
 };
 
 #endif // FUZZY_CLOCK_WINDOW_H
